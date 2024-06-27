@@ -19,6 +19,8 @@ function App() {
           {!address ? "Connect" : address}
         </Button>
 
+        <div className="mt-5" />
+
         {address && (
           <>
             <AddFunding collateralDecimals={6} />
