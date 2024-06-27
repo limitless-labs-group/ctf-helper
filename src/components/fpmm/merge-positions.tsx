@@ -25,18 +25,24 @@ export const MergePositions = ({}: IMergePositions) => {
   const { writeContractAsync } = useWriteContract();
 
   const onSubmit: SubmitHandler<MergePositionsArgs> = async (data) => {
+    console.log("data", data);
     let tx: `0x${string}`;
     const fpmm = getContract({
       abi: fixedProductMarketMakerAbi,
       address: getAddress(data.marketAddr),
       client: viemPublicClient,
     });
-    const [[conditionId], collateralTokenAddr, conditionalTokensAddr] =
+    const [conditionId, collateralTokenAddr, conditionalTokensAddr] =
       await Promise.all([
-        fpmm.read.conditionIds() as Promise<string[]>,
+        fpmm.read.conditionIds([0]) as Promise<string>,
         fpmm.read.collateralToken() as Promise<string>,
         fpmm.read.conditionalTokens() as Promise<string>,
       ]);
+    console.log({
+      conditionId,
+      collateralTokenAddr,
+      conditionalTokensAddr,
+    });
     const conditionalTokens = getContract({
       abi: conditionalTokensAbi,
       address: getAddress(conditionalTokensAddr),
@@ -52,6 +58,7 @@ export const MergePositions = ({}: IMergePositions) => {
         ]) as Promise<string>;
       })
     );
+    console.log({ collectionIds });
     const positionIds = await Promise.all(
       collectionIds.map((collectionId) => {
         return conditionalTokens.read.getPositionId([
@@ -60,6 +67,7 @@ export const MergePositions = ({}: IMergePositions) => {
         ]) as Promise<bigint>;
       })
     );
+    console.log({ positionIds });
     const [yes, no] = await Promise.all(
       positionIds.map((positionId) => {
         return conditionalTokens.read.balanceOf([
@@ -68,10 +76,11 @@ export const MergePositions = ({}: IMergePositions) => {
         ]) as Promise<bigint>;
       })
     );
+    console.log({ yes, no });
 
     tx = await writeContractAsync({
-      abi: fixedProductMarketMakerAbi,
-      functionName: "addFunding",
+      abi: conditionalTokensAbi,
+      functionName: "mergePositions",
       args: [
         collateralTokenAddr,
         zeroHash,
