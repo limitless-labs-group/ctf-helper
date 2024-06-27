@@ -1,6 +1,13 @@
-/* eslint-disable */
+import { Address, erc20Abi, getAddress, getContract, parseUnits } from "viem";
+import { useAccount, usePublicClient, useWriteContract } from "wagmi";
 import { fixedProductMarketMakerAbi } from "@/abis";
+import { useForm, SubmitHandler } from "react-hook-form";
+import { useMutation } from "@tanstack/react-query";
+import { useToast } from "@/components/ui/use-toast";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@radix-ui/react-label";
 import {
   Card,
   CardContent,
@@ -9,11 +16,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@radix-ui/react-label";
-import { useAccount, usePublicClient, useWriteContract } from "wagmi";
-import { useForm, SubmitHandler } from "react-hook-form";
-import { Address, erc20Abi, getAddress, getContract, parseUnits } from "viem";
 
 interface AddFundingArgs {
   marketAddr: Address;
@@ -23,57 +25,92 @@ export interface IAddFunding {}
 
 export const AddFunding = ({}: IAddFunding) => {
   const client = usePublicClient();
+  const { toast } = useToast();
   const { address } = useAccount();
-  const { register, handleSubmit } = useForm<AddFundingArgs>();
   const { writeContractAsync } = useWriteContract();
-
-  const onSubmit: SubmitHandler<AddFundingArgs> = async (data) => {
-    let tx: `0x${string}`;
-    const [marketAddr] = [getAddress(data.marketAddr)];
-    const fpmm = getContract({
-      abi: fixedProductMarketMakerAbi,
-      address: getAddress(data.marketAddr),
-      client: client!,
-    });
-    const collateralTokenAddr = (await fpmm.read.collateralToken()) as string;
-    const erc20 = getContract({
-      abi: erc20Abi,
-      address: getAddress(collateralTokenAddr),
-      client: client!,
-    });
-
-    const collateralDecimals = await erc20.read.decimals();
-    const _funding = parseUnits(data.funding, collateralDecimals);
-    const allowance = await erc20.read.allowance([
-      address!,
-      getAddress(data.marketAddr),
-    ]);
-    if (allowance < _funding) {
-      tx = await writeContractAsync({
+  const { register, handleSubmit } = useForm<AddFundingArgs>();
+  const { mutateAsync: addFunding, isPending } = useMutation({
+    mutationKey: ["addFunding"],
+    mutationFn: async (data: AddFundingArgs) => {
+      let tx: `0x${string}`;
+      const [marketAddr] = [getAddress(data.marketAddr)];
+      const fpmm = getContract({
+        abi: fixedProductMarketMakerAbi,
+        address: getAddress(data.marketAddr),
+        client: client!,
+      });
+      const collateralTokenAddr = (await fpmm.read.collateralToken()) as string;
+      const erc20 = getContract({
         abi: erc20Abi,
-        functionName: "approve",
-        args: [marketAddr, _funding],
         address: getAddress(collateralTokenAddr),
+        client: client!,
+      });
+
+      const collateralDecimals = await erc20.read.decimals();
+      const funding = parseUnits(data.funding, collateralDecimals);
+      const allowance = await erc20.read.allowance([
+        address!,
+        getAddress(data.marketAddr),
+      ]);
+      if (allowance < funding) {
+        toast({
+          title: "Approval Needed",
+          description: "Prompting to integrated web3 wallet for approve spend.",
+        });
+
+        tx = await writeContractAsync({
+          abi: erc20Abi,
+          functionName: "approve",
+          args: [marketAddr, funding],
+          address: getAddress(collateralTokenAddr),
+        });
+        toast({
+          title: "Transaction Submitted",
+          description: "Successfully submitted transaction.",
+        });
+
+        await client!.waitForTransactionReceipt({
+          hash: tx,
+        });
+        toast({
+          title: "Transaction Confirmed",
+          description: "The transaction has been confirmed.",
+        });
+      }
+
+      toast({
+        title: "Add Funding",
+        description: "Submitting add funding transaction.",
+      });
+      tx = await writeContractAsync({
+        abi: fixedProductMarketMakerAbi,
+        functionName: "addFunding",
+        args: [funding, []],
+        address: getAddress(data.marketAddr),
       });
       await client!.waitForTransactionReceipt({
         hash: tx,
       });
-    }
-
-    tx = await writeContractAsync({
-      abi: fixedProductMarketMakerAbi,
-      functionName: "addFunding",
-      args: [_funding, []],
-      address: getAddress(data.marketAddr),
-    });
-    await client!.waitForTransactionReceipt({
-      hash: tx,
-    });
-  };
+      toast({
+        title: "Transaction Confirmed",
+        description: "The transaction has been confirmed.",
+      });
+    },
+    onError(error, variables, context) {
+      console.error({ error, variables, context });
+      toast({
+        variant: "destructive",
+        title: "Uh oh! Something went wrong.",
+        description: "There was a problem with your request.",
+      });
+    },
+  });
+  const onSubmit: SubmitHandler<AddFundingArgs> = async (data) =>
+    addFunding(data);
 
   return (
     <form onSubmit={handleSubmit(onSubmit)}>
-      <Card className="w-[350px]">
+      <Card className="w-auto">
         <CardHeader>
           <CardTitle>Add Funding</CardTitle>
           <CardDescription>Add funding to a market.</CardDescription>
@@ -100,8 +137,17 @@ export const AddFunding = ({}: IAddFunding) => {
             </div>
           </div>
         </CardContent>
-        <CardFooter className="flex justify-end">
-          <Button type="submit">Execute</Button>
+        <CardFooter className="flex justify-start">
+          <Button size="lg" type="submit" disabled={isPending}>
+            {isPending ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Please wait
+              </>
+            ) : (
+              "Execute"
+            )}
+          </Button>
         </CardFooter>
       </Card>
     </form>
