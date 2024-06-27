@@ -1,8 +1,7 @@
 import { conditionalTokensAbi, fixedProductMarketMakerAbi } from "@/abis";
 import { Address, getAddress, getContract, zeroHash } from "viem";
-import { useAccount, useWriteContract } from "wagmi";
+import { useAccount, usePublicClient, useWriteContract } from "wagmi";
 import { useForm, SubmitHandler } from "react-hook-form";
-import { viemPublicClient } from "@/config";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@radix-ui/react-label";
@@ -20,6 +19,7 @@ interface MergePositionsArgs {
 export interface IMergePositions {}
 
 export const MergePositions = ({}: IMergePositions) => {
+  const client = usePublicClient();
   const { address } = useAccount();
   const { register, handleSubmit } = useForm<MergePositionsArgs>();
   const { writeContractAsync } = useWriteContract();
@@ -30,7 +30,7 @@ export const MergePositions = ({}: IMergePositions) => {
     const fpmm = getContract({
       abi: fixedProductMarketMakerAbi,
       address: getAddress(data.marketAddr),
-      client: viemPublicClient,
+      client: client!,
     });
     const [conditionId, collateralTokenAddr, conditionalTokensAddr] =
       await Promise.all([
@@ -46,7 +46,7 @@ export const MergePositions = ({}: IMergePositions) => {
     const conditionalTokens = getContract({
       abi: conditionalTokensAbi,
       address: getAddress(conditionalTokensAddr),
-      client: viemPublicClient,
+      client: client!,
     });
 
     const collectionIds = await Promise.all(
@@ -88,9 +88,9 @@ export const MergePositions = ({}: IMergePositions) => {
         [1, 2],
         yes < no ? yes : no,
       ],
-      address: getAddress(data.marketAddr),
+      address: getAddress(conditionalTokensAddr),
     });
-    await viemPublicClient.waitForTransactionReceipt({
+    await client!.waitForTransactionReceipt({
       hash: tx,
     });
   };

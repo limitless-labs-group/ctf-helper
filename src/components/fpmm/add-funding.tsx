@@ -11,10 +11,9 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@radix-ui/react-label";
-import { useAccount, useWriteContract } from "wagmi";
+import { useAccount, usePublicClient, useWriteContract } from "wagmi";
 import { useForm, SubmitHandler } from "react-hook-form";
 import { Address, erc20Abi, getAddress, getContract, parseUnits } from "viem";
-import { viemPublicClient } from "@/config";
 
 interface AddFundingArgs {
   marketAddr: Address;
@@ -23,6 +22,7 @@ interface AddFundingArgs {
 export interface IAddFunding {}
 
 export const AddFunding = ({}: IAddFunding) => {
+  const client = usePublicClient();
   const { address } = useAccount();
   const { register, handleSubmit } = useForm<AddFundingArgs>();
   const { writeContractAsync } = useWriteContract();
@@ -33,13 +33,13 @@ export const AddFunding = ({}: IAddFunding) => {
     const fpmm = getContract({
       abi: fixedProductMarketMakerAbi,
       address: getAddress(data.marketAddr),
-      client: viemPublicClient,
+      client: client!,
     });
     const collateralTokenAddr = (await fpmm.read.collateralToken()) as string;
     const erc20 = getContract({
       abi: erc20Abi,
       address: getAddress(collateralTokenAddr),
-      client: viemPublicClient,
+      client: client!,
     });
 
     const collateralDecimals = await erc20.read.decimals();
@@ -55,7 +55,7 @@ export const AddFunding = ({}: IAddFunding) => {
         args: [marketAddr, _funding],
         address: getAddress(collateralTokenAddr),
       });
-      await viemPublicClient.waitForTransactionReceipt({
+      await client!.waitForTransactionReceipt({
         hash: tx,
       });
     }
@@ -66,7 +66,7 @@ export const AddFunding = ({}: IAddFunding) => {
       args: [_funding, []],
       address: getAddress(data.marketAddr),
     });
-    await viemPublicClient.waitForTransactionReceipt({
+    await client!.waitForTransactionReceipt({
       hash: tx,
     });
   };

@@ -10,10 +10,9 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@radix-ui/react-label";
-import { useWriteContract } from "wagmi";
+import { usePublicClient, useWriteContract } from "wagmi";
 import { useForm, SubmitHandler } from "react-hook-form";
 import { Address, erc20Abi, getAddress, getContract, parseUnits } from "viem";
-import { viemPublicClient } from "@/config";
 
 interface RemoveFundingArgs {
   marketAddr: Address;
@@ -22,6 +21,7 @@ interface RemoveFundingArgs {
 export interface IRemoveFunding {}
 
 export const RemoveFunding = ({}: IRemoveFunding) => {
+  const client = usePublicClient();
   const { register, handleSubmit } = useForm<RemoveFundingArgs>();
   const { writeContractAsync } = useWriteContract();
 
@@ -31,7 +31,7 @@ export const RemoveFunding = ({}: IRemoveFunding) => {
     const fpmm = getContract({
       abi: fixedProductMarketMakerAbi,
       address: getAddress(data.marketAddr),
-      client: viemPublicClient,
+      client: client!,
     });
     const [conditionalTokensAddr, collateralTokenAddr] = await Promise.all([
       fpmm.read.conditionalTokens() as Promise<string>,
@@ -40,7 +40,7 @@ export const RemoveFunding = ({}: IRemoveFunding) => {
     const erc20 = getContract({
       abi: erc20Abi,
       address: getAddress(collateralTokenAddr),
-      client: viemPublicClient,
+      client: client!,
     });
 
     const collateralDecimals = await erc20.read.decimals();
@@ -52,7 +52,7 @@ export const RemoveFunding = ({}: IRemoveFunding) => {
       args: [marketAddr, true],
       address: getAddress(conditionalTokensAddr),
     });
-    await viemPublicClient.waitForTransactionReceipt({
+    await client!.waitForTransactionReceipt({
       hash: tx,
     });
 
@@ -62,7 +62,7 @@ export const RemoveFunding = ({}: IRemoveFunding) => {
       args: [sharesToBurn],
       address: marketAddr,
     });
-    await viemPublicClient.waitForTransactionReceipt({
+    await client!.waitForTransactionReceipt({
       hash: tx,
     });
   };
