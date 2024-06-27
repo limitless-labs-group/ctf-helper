@@ -23,7 +23,7 @@ function App() {
 
         {address && (
           <>
-            <AddFunding collateralDecimals={6} />
+            <AddFunding />
           </>
         )}
       </main>
