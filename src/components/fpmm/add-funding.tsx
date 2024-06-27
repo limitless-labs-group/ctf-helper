@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { fixedProductMarketMakerAbi } from "@/abis";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,7 +11,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@radix-ui/react-label";
-import { useAccount, useReadContract, useWriteContract } from "wagmi";
+import { useAccount, useWriteContract } from "wagmi";
 import { useForm, SubmitHandler } from "react-hook-form";
 import { Address, erc20Abi, getAddress, getContract, parseUnits } from "viem";
 import { viemPublicClient } from "@/config";
